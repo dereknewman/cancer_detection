@@ -36,11 +36,13 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
     if xml.LidcReadMessage is None:
         return None, None, None
     patient_id = xml.LidcReadMessage.ResponseHeader.SeriesInstanceUid.text
-
+    
+    #If only looking for a single pateinte ID, return (None, None, None) if not the correct patient ID
     if only_patient is not None:
         if only_patient != patient_id:
             return None, None, None
-
+        
+    #find the associated '.mhd' file, or return (None, None, None)
     src_path = find_mhd_file(patient_id)
     if src_path is None:
         return None, None, None
@@ -78,9 +80,9 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
                     y_min = min(y_min, y)
                     x_max = max(x_max, x)
                     y_max = max(y_max, y)
-                if x_max == x_min:
+                if x_max == x_min:   #TODO: THESE DO NOT SEEM NEEDED 
                     continue
-                if y_max == y_min:
+                if y_max == y_min:   #TODO: THESE DO NOT SEEM NEEDED 
                     continue
 
             x_diameter = x_max - x_min
@@ -172,6 +174,8 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
 
 
 def normalize(image):
+    """ Normalize image -> clip data between -1000 and 400. Scale values to 0 to 1. #### SCALE TO -.5 to .5 ##### TODO:???????
+    """
     MIN_BOUND = -1000.0
     MAX_BOUND = 400.0
     image = (image - MIN_BOUND) / (MAX_BOUND - MIN_BOUND)
@@ -181,7 +185,10 @@ def normalize(image):
 
 
 def process_image(src_path):
-    patient_id = ntpath.basename(src_path).replace(".mhd", "")
+    """Load the '.mhd' file, extract the 3D numpy array, rescale the data, 
+    write out each slice as '.png' and each segmented mask as '.png'
+    """
+    patient_id = ntpath.basename(src_path).replace(".mhd", "") #extract patient id from filename
     print("Patient: ", patient_id)
 
     dst_dir = settings.LUNA16_EXTRACTED_IMAGE_DIR + patient_id + "/"
@@ -209,7 +216,7 @@ def process_image(src_path):
     img_list = []
     for i in range(img_array.shape[0]):
         img = img_array[i]
-        seg_img, mask = helpers.get_segmented_lungs(img.copy())
+        seg_img, mask = helpers.get_segmented_lungs(img.copy()) #find the segmented image and the mask
         img_list.append(seg_img)
         img = normalize(img)
         cv2.imwrite(dst_dir + "img_" + str(i).rjust(4, '0') + "_i.png", img * 255)
@@ -603,11 +610,17 @@ def process_auto_candidates_patient(src_path, patient_id, sample_count=1000, can
 
 
 def process_images(delete_existing=False, only_process_patient=None):
+    """ Used to call the function process_image() for each patient id in each of
+    'subset' folders for LUNA2016 data. Uses multiple threads to process each '.mhd' file.
+    """
+    
+    #Remove data from directory and remove directory (if delete_existing set to TRUE)
     if delete_existing and os.path.exists(settings.LUNA16_EXTRACTED_IMAGE_DIR):
         print("Removing old stuff..")
         if os.path.exists(settings.LUNA16_EXTRACTED_IMAGE_DIR):
             shutil.rmtree(settings.LUNA16_EXTRACTED_IMAGE_DIR)
 
+    #Create directory if it does not exist
     if not os.path.exists(settings.LUNA16_EXTRACTED_IMAGE_DIR):
         os.mkdir(settings.LUNA16_EXTRACTED_IMAGE_DIR)
         os.mkdir(settings.LUNA16_EXTRACTED_IMAGE_DIR + "_labels/")
@@ -617,7 +630,7 @@ def process_images(delete_existing=False, only_process_patient=None):
         src_paths = glob.glob(src_dir + "*.mhd")
 
         if only_process_patient is None and True:
-            pool = multiprocessing.Pool(6)
+            pool = multiprocessing.Pool(8) #<==== SET THE THREAD COUNT
             pool.map(process_image, src_paths)
         else:
             for src_path in src_paths:
