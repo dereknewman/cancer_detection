@@ -18,6 +18,8 @@ numpy.random.seed(1321)
 
 
 def find_mhd_file(patient_id):
+    """ find the '.mhd' file associated with a specific patient_id
+    """
     for subject_no in range(settings.LUNA_SUBSET_START_INDEX, 10):
         src_dir = settings.LUNA16_RAW_SRC_DIR + "subset" + str(subject_no) + "/"
         for src_path in glob.glob(src_dir + "*.mhd"):
@@ -27,6 +29,9 @@ def find_mhd_file(patient_id):
 
 
 def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodules=False):
+    """ Read the xml file and create a csv with the (x,y,z) location, diameter, and malignacy of
+    the positive examples, and a csv with the negative examples
+    """
     pos_lines = []
     neg_lines = []
     extended_lines = []
@@ -49,7 +54,7 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
 
     print(patient_id)
     itk_img = SimpleITK.ReadImage(src_path)
-    img_array = SimpleITK.GetArrayFromImage(itk_img)
+    img_array = SimpleITK.GetArrayFromImage(itk_img) # indexes are z,y,x (notice the ordering)
     num_z, height, width = img_array.shape        #heightXwidth constitute the transverse plane
     origin = numpy.array(itk_img.GetOrigin())      # x,y,z  Origin in world coordinates (mm)
     spacing = numpy.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
@@ -80,9 +85,9 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
                     y_min = min(y_min, y)
                     x_max = max(x_max, x)
                     y_max = max(y_max, y)
-                if x_max == x_min:   #TODO: THESE DO NOT SEEM NEEDED 
+                if x_max == x_min:
                     continue
-                if y_max == y_min:   #TODO: THESE DO NOT SEEM NEEDED 
+                if y_max == y_min:
                     continue
 
             x_diameter = x_max - x_min
@@ -138,6 +143,8 @@ def load_lidc_xml(xml_path, agreement_threshold=0, only_patient=None, save_nodul
             line = [nodule_id, x_center_perc, y_center_perc, z_center_perc, diameter_perc, 0]
             neg_lines.append(line)
 
+    # Check the distance from each nodule and compare against diameter of each nodule
+    #
     if agreement_threshold > 1:
         filtered_lines = []
         for pos_line1 in pos_lines:
@@ -224,6 +231,8 @@ def process_image(src_path):
 
 
 def process_pos_annotations_patient(src_path, patient_id):
+    """ Process annotations from annotations.csv
+    """
     df_node = pandas.read_csv("resources/luna16_annotations/annotations.csv")
     dst_dir = settings.LUNA16_EXTRACTED_IMAGE_DIR + "_labels/"
     if not os.path.exists(dst_dir):
