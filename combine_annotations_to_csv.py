@@ -88,23 +88,33 @@ full_dataframe.to_csv(settings.BASE_DIR + "patID_x_y_z_mal.csv", index=False)
 
 patients = full_dataframe.patient_id.unique()
 
-for patient in patients:
+for patient in patients[0:1]:
+    print("A")
     patient_path = find_mhd_file(patient) #locate the path to the '.mhd' file
     image_array = fetch_image(patient_path)
+    image_shape = image_array.shape
     print(patient)
     patient_df = full_dataframe.loc[full_dataframe['patient_id'] == patient] #create a dateframe assoicated to a single patient
-    fetch_image(src_path)
     for index, row in patient_df.iterrows():
-        print(row)
+        x = int(row["coord_x"]*image_shape[0])
+        y = int(row["coord_y"]*image_shape[1])
+        z = int(row["coord_z"]*image_shape[2])
         
+        print(x,y,z)
     
+    
+import matplotlib.pylab as plt
+import matplotlib.patches as patches
+fig1,ax1 = plt.imshow(image_array[z,:,:],cmap="gray")
+rect = patches.Rectangle((x-32,y-32),x+32,y+32,linewidth=1,edgecolor='r',facecolor='none')
+fig1.add_patch(rect)
 
+plt.imshow(image_array[184,:,:],cmap="gray")
 
-
-
-
-
-
+im = image_array[44,:,:]
+image_ = np.stack([im, im, im],axis=2)
+image_[x-32:x+32,y-32:y+32,0] = 30
+plt.imshow(image_, cmap = "gray")
 
 
 
