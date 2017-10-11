@@ -38,7 +38,7 @@ def load_lidc_xml(xml_path):
     full_df = pandas.DataFrame(columns=["patient_id", "x_center", "y_center", 
                                         "z_center", "diameter", "x_center_perc", 
                                         "y_center_perc", "z_center_perc", "diameter_perc", 
-                                        "malscore", "file_path"])
+                                        "malscore", "spiculation", "lobulation", "file_path","xml_path"])
     with open(xml_path, 'r') as xml_file:
         markup = xml_file.read()
     xml = BeautifulSoup(markup, features="xml")
@@ -46,10 +46,10 @@ def load_lidc_xml(xml_path):
         return full_df #Empty dataframe
     patient_id = xml.LidcReadMessage.ResponseHeader.SeriesInstanceUid.text
         
-    ##find the associated '.mhd' file, or return (None, None, None)
-    #src_path = find_mhd_file(patient_id)
-    #if src_path is None:
-    #    return full_df #Empty dataframe
+    #find the associated '.mhd' file, or return (None, None, None)
+    src_path = find_mhd_file(patient_id)
+    if src_path is None:
+        return full_df #Empty dataframe
 
     print(patient_id)
     ###########################################################################
@@ -86,11 +86,6 @@ def load_lidc_xml(xml_path):
                     y_min = min(y_min, y)
                     x_max = max(x_max, x)
                     y_max = max(y_max, y)
-                if x_max == x_min:
-                    continue
-                if y_max == y_min:
-                    continue
-
             x_diameter = x_max - x_min
             x_center = x_min + x_diameter / 2
             y_diameter = y_max - y_min
@@ -114,16 +109,16 @@ def load_lidc_xml(xml_path):
                 continue
 
             malignacy = nodule.characteristics.malignancy.text
-            sphericiy = nodule.characteristics.sphericity.text
-            margin = nodule.characteristics.margin.text
+            #sphericiy = nodule.characteristics.sphericity.text
+            #margin = nodule.characteristics.margin.text
             spiculation = nodule.characteristics.spiculation.text
-            texture = nodule.characteristics.texture.text
-            calcification = nodule.characteristics.calcification.text
-            internal_structure = nodule.characteristics.internalStructure.text
+            #texture = nodule.characteristics.texture.text
+            #calcification = nodule.characteristics.calcification.text
+            #internal_structure = nodule.characteristics.internalStructure.text
             lobulation = nodule.characteristics.lobulation.text
-            subtlety = nodule.characteristics.subtlety.text
+            #subtlety = nodule.characteristics.subtlety.text
 
-            line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, malignacy, src_path]
+            line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, malignacy, spiculation, lobulation, src_path, xml_path]
             #extended_line = [patient_id, nodule_id, x_center_perc, y_center_perc, z_center_perc, diameter_perc, malignacy, sphericiy, margin, spiculation, texture, calcification, internal_structure, lobulation, subtlety ]
             lines.append(line)
             #extended_lines.append(extended_line)
@@ -142,10 +137,10 @@ def load_lidc_xml(xml_path):
             diameter = 0
             diameter_perc = round(max(6 / img_array.shape[2], 6 / img_array.shape[1]), 4)
             # print("Non nodule!", z_center)
-            line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, 0, src_path]
+            line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, 0, 0, 0, src_path, xml_path]
             lines.append(line)
 
-    full_df = pandas.DataFrame(lines, columns=["patient_id", "x_center", "y_center", "z_center", "diameter", "x_center_perc", "y_center_perc", "z_center_perc", "diameter_perc", "malscore", "file_path"])
+    full_df = pandas.DataFrame(lines, columns=["patient_id", "x_center", "y_center", "z_center", "diameter", "x_center_perc", "y_center_perc", "z_center_perc", "diameter_perc", "malscore", "spiculation", "lobulation", "file_path","xml_path"])
     return full_df
 
 
@@ -153,10 +148,10 @@ xml_dir = "/media/derek/disk1/kaggle_ndsb2017/resources/_luna16_xml/"
 full_dataframe = pandas.DataFrame(columns=["patient_id", "x_center", "y_center", 
                                     "z_center", "diameter", "x_center_perc", 
                                     "y_center_perc", "z_center_perc", "diameter_perc", 
-                                    "malscore", "file_path"])
+                                    "malscore", "spiculation", "lobulation", "file_path", "xml_path"])
 
 # Verify that the directory exists
-if not os.path.isdir(src_dir):
+if not os.path.isdir(xml_dir):
     print(xml_dir + " directory does not exist")
 
 for file_ in os.listdir(xml_dir):
