@@ -74,7 +74,7 @@ def patient_to_tfrecord(patient_id, image_array, patient_df):
                 'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_cube]))
                 }))
         writer.write(example.SerializeToString())
-writer.close()
+    writer.close()
 
 patient_id = "1.4.5.6.123551485448654"
 tfrecord_file = patient_id + ".tfrecord"  

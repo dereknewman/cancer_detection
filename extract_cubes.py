@@ -72,37 +72,51 @@ def extract_cube(image_array,z_perc,y_perc,x_perc):
     image_cube = image_array[z_min:z_max,y_min:y_max,x_min:x_max]
     return image_cube
 
-def patient_to_tfrecord(save_path,patient_id, image_array, patient_df):
-    patient_id = "1.4.5.6.123551485448654"
-    tfrecord_file = patient_id + ".tfrecord"  
-    writer = tf.python_io.TFRecordWriter(tfrecord_file)
-    for i in range(1000):
-        add_to_tfrecord(writer,image_cube, label)
-    writer.close()
+#def patient_to_tfrecord(save_path,patient_id, image_array, patient_df):
+#    patient_id = "1.4.5.6.123551485448654"
+#    tfrecord_file = patient_id + ".tfrecord"  
+#    writer = tf.python_io.TFRecordWriter(tfrecord_file)
+#    for i in range(1000):
+#        add_to_tfrecord(writer,image_cube, label)
+#    writer.close()
+
+#def add_to_tfrecord(writer,image_cube, label):
+#        image_cube = np.asarray(image_cube,np.int16) #ensure data is in int16
+#        binary_cube = image_cube.tobytes()
+#        image_mal, image_spic, image_lob = np.array(label,np.int64) #ensure data is in int16
+#        image_height, image_width, image_depth = np.array(image_cube.shape, np.int64) #ensure data is in int16
+#        
+#        example = tf.train.Example(features=tf.train.Features(feature={
+#                'height': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_height])),
+#                'width': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_width])),
+#                'depth': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_depth])),
+#                'mal': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_mal])),
+#                'spic': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_spic])),
+#                'lob': tf.train.Feature(int64_list=tf.train.Int64List(value=[image_lob])),
+#                'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_cube]))
+#                }))
+#        writer.write(example.SerializeToString())
 
 def add_to_tfrecord(writer,image_cube, label):
         image_cube = np.asarray(image_cube,np.int16) #ensure data is in int16
+        image_shape = image_cube.shape
         binary_cube = image_cube.tobytes()
-        image_label = np.array(label,np.int16) #ensure data is in int16
-        binary_label = image_label.tobytes()
-        shape = np.array(image_cube.shape, np.int32) #ensure data is in int16
-        binary_shape = shape.tobytes()
+        binary_label = np.array(image_label, np.int16).tobytes()
+        binary_shape = np.array(image_shape, np.int16).tobytes()
         
         example = tf.train.Example(features=tf.train.Features(feature={
-                'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_label])),
                 'shape': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_shape])),
-                'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_cube]))
+                'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_label])),
+                'cube': tf.train.Feature(bytes_list=tf.train.BytesList(value=[binary_cube]))
                 }))
         writer.write(example.SerializeToString())
 
-
-
 #################
-save_path = "/media/derek/disk1/kaggle_ndsb2017/resources/_cubes/"
+save_path = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/"
 full_dataframe = pd.read_csv(settings.BASE_DIR + "patID_x_y_z_mal.csv")
 patients = full_dataframe.patient_id.unique()
 #patient = "1.3.6.1.4.1.14519.5.2.1.6279.6001.131939324905446238286154504249"
-for patient in patients[2:5]:
+for patient in patients:
     patient_df = full_dataframe.loc[full_dataframe['patient_id'] == patient] #create a dateframe assoicated to a single patient
     patient_df = patient_df.sort_values('z_center')
     patient_path = patient_df.file_path.unique()[0]  #locate the path to the '.mhd' file
