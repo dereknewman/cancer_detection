@@ -50,17 +50,31 @@ def _resize_function(image_decoded, label):
   image_resized = tf.image.resize_images(image_decoded, [28, 28])
   return image_resized, label
 
+def augment_data(transpose_index,k_value, cubes):
+    cubes_trans = tf.map_fn(lambda img: tf.transpose(img, transpose_index), cubes)
+    cubes_90 = tf.map_fn(lambda img: tf.image.rot90(img,k=k_value), cubes_trans)
+    cubes_lr = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cubes_90)
+    return cubes_lr
+    
+
 global_step = tf.contrib.framework.get_or_create_global_step()
 
 filenames = tf.placeholder(tf.string, shape=[None])
 dataset = tf.contrib.data.TFRecordDataset(filenames)
 dataset = dataset.map(_parse_function)  # Parse the record into tensors.
+dataset = dataset.shuffle(buffer_size=10000)
+
 dataset = dataset.repeat()  # Repeat the input indefinitely.
 dataset = dataset.batch(BATCH_SIZE)
 iterator = dataset.make_initializable_iterator()
 
 next_element = iterator.get_next()
+
+transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
+k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+
 shape,label,cubes = next_element
+cubes_aug = augment_data(transpose_index,k_value, cubes)
 
 #mal, lob, spic = tf.unstack(label,num = 3)
 mal, lob, spic = tf.split(label,3,axis=1)
@@ -140,7 +154,7 @@ kernel1 = _variable_with_weight_decay('weights1',
                                      shape=[5, 5, 32, 64],
                                      stddev=5e-2,
                                      wd=0.0)
-conv1_ = tf.nn.conv2d(cubes, kernel1, [1, 1, 1, 1], padding='SAME')
+conv1_ = tf.nn.conv2d(cubes_aug, kernel1, [1, 1, 1, 1], padding='SAME')
 biases1 = _variable_initializer('biases1', [64], tf.constant_initializer(0.0))
 pre_activation1 = tf.nn.bias_add(conv1_, biases1)
 conv1 = tf.nn.relu(pre_activation1, name='scope.name1')
@@ -244,32 +258,45 @@ train_op = apply_gradient_op
 sess = tf.InteractiveSession()
 init = tf.global_variables_initializer()
 sess.run(init)
-src_dir = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/"
-filenames_all = os.listdir(src_dir)
-training_filenames = [src_dir + f for f in filenames_all]
-sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
+src_dir_train = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/train/"
+src_dir_test = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/test/"
+filenames_train = os.listdir(src_dir_train)
+filenames_test = os.listdir(src_dir_test)
+training_filenames = [src_dir_train + f for f in filenames_train]
+testing_filenames = [src_dir_test + f for f in filenames_test]
 
-print(sess.run(shape))
-c = sess.run(cubes)
-sh = sess.run(shape)
-l = sess.run(label)
-m = sess.run(mal)
+
+
+
+
+
+f_train = open("train_values.txt","a")
+f_test = open("test_values.txt","a")
+transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
+
+#sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
+
+for index in range(10000):
+    sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
+    for i in range(100):
+        sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
+    train_results = sess.run(cross_entropy_mean,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    print(train_results)
+    f_train.write(str(train_results) + "\n")
+    sess.run(iterator.initializer, feed_dict={filenames: testing_filenames})
+    test_results = sess.run(cross_entropy_mean,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    f_test.write(str(test_results) + "\n")
+    f_train.flush()
+    f_test.flush()
+
 
 #t,l1h = sess.run([test,label_onehot_i64])
-
-validation_filenames = [src_dir + f for f in filenames_all]
-sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
-
-shape,label,cube = sess.run(next_element)
-
-
-for index in range(100000):
-    if (index % 100)==0:
-        print(sess.run(cross_entropy_mean))
-    sess.run(train_op)
-
-
-
+#shape,label,cube = sess.run(next_element)
+#print(sess.run(shape))
+#c = sess.run(cubes)
+#sh = sess.run(shape)
+#l = sess.run(label)
+#m = sess.run(mal)
 
 
 #
