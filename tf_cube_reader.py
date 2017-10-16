@@ -9,26 +9,9 @@ Created on Wed Oct 11 14:36:29 2017
 import os
 import tensorflow as tf
 import numpy as np
-import argparse
-
-#TODO:
 
 
-parser = argparse.ArgumentParser()
-
-# Basic model parameters.
-parser.add_argument('--batch_size', type=int, default=128,
-                    help='Number of images to process in a batch.')
-
-parser.add_argument('--data_dir', type=str, default='/tmp/cifar10_data',
-                    help='Path to the CIFAR-10 data directory.')
-
-parser.add_argument('--use_fp16', type=bool, default=False,
-                    help='Train the model using fp16.')
-
-FLAGS = parser.parse_args()
 BATCH_SIZE = 128
-#FLAGS.use_fp16 = False
 NUM_CLASSES = 6
 
 def _parse_function(example_proto):
@@ -80,10 +63,6 @@ cubes_aug = augment_data(transpose_index,k_value, cubes)
 mal, lob, spic = tf.split(label,3,axis=1)
 label_onehot = tf.one_hot(mal,6)
 label_f= tf.reshape(mal,[BATCH_SIZE])
-
-
-
-
 
 ##########################################################################
 ##########################################################################
@@ -266,10 +245,6 @@ training_filenames = [src_dir_train + f for f in filenames_train]
 testing_filenames = [src_dir_test + f for f in filenames_test]
 
 
-
-
-
-
 f_train = open("train_values.txt","a")
 f_test = open("test_values.txt","a")
 transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
@@ -290,27 +265,7 @@ for index in range(10000):
     f_test.flush()
 
 
-#t,l1h = sess.run([test,label_onehot_i64])
-#shape,label,cube = sess.run(next_element)
-#print(sess.run(shape))
-#c = sess.run(cubes)
-#sh = sess.run(shape)
-#l = sess.run(label)
-#m = sess.run(mal)
 
-
-#
-#sess = tf.Session()
-## Compute for 100 epochs.
-#for _ in range(100):
-#  sess.run(iterator.initializer)
-#  while True:
-#    try:
-#      sess.run(next_element)
-#    except tf.errors.OutOfRangeError:
-#      break
-#
-#  # [Perform end-of-epoch calculations here.]
 
 
 
