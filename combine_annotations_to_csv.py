@@ -5,7 +5,7 @@ Created on Mon Oct  9 14:35:08 2017
 
 @author: derek
 """
-import settings
+
 import os
 import pandas as pd
 import numpy as np
@@ -13,26 +13,33 @@ import glob
 import ntpath
 import SimpleITK
 import helpers
-import cv2
+
+BASE_DIR = "/media/derek/disk1/kaggle_ndsb2017/"
+BASE_DIR_SSD = "/media/derek/disk1/kaggle_ndsb2017/"
+LUNA16_EXTRACTED_IMAGE_DIR = BASE_DIR_SSD + "luna16_extracted_images/"
+TARGET_VOXEL_MM = 0.682
+LUNA_SUBSET_START_INDEX = 0
+LUNA16_RAW_SRC_DIR = BASE_DIR + "luna_raw/"
 
 def find_mhd_file(patient_id):
     """ find the '.mhd' file associated with a specific patient_id
     """
-    for subject_no in range(settings.LUNA_SUBSET_START_INDEX, 10):
-        src_dir = settings.LUNA16_RAW_SRC_DIR + "subset" + str(subject_no) + "/"
+    for subject_no in range(LUNA_SUBSET_START_INDEX, 10):
+        src_dir = LUNA16_RAW_SRC_DIR + "subset" + str(subject_no) + "/"
         for src_path in glob.glob(src_dir + "*.mhd"):
             if patient_id in src_path:
                 return src_path
     return None
 
 def normalize(image):
-    """ Normalize image -> clip data between -1000 and 400. Scale values to 0 to 1. #### SCALE TO -.5 to .5 ##### TODO:???????
+    """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 
     """
     MIN_BOUND = -1000.0
     MAX_BOUND = 400.0
     image = (image - MIN_BOUND) / (MAX_BOUND - MIN_BOUND)
     image[image > 1] = 1.
     image[image < 0] = 0.
+    image -= 0.5
     return image
 
 def fetch_image(src_path):
@@ -55,13 +62,13 @@ def fetch_image(src_path):
 
     spacing = np.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
     print("Spacing (x,y,z): ", spacing)
-    rescale = spacing / settings.TARGET_VOXEL_MM
+    rescale = spacing / TARGET_VOXEL_MM
     print("Rescale: ", rescale)
 
-    img_array = helpers.rescale_patient_images(img_array, spacing, settings.TARGET_VOXEL_MM)
+    img_array = helpers.rescale_patient_images(img_array, spacing, TARGET_VOXEL_MM)
     return normalize(img_array)
 
-src_dir = settings.LUNA16_EXTRACTED_IMAGE_DIR + "_labels/"
+src_dir = LUNA16_EXTRACTED_IMAGE_DIR + "_labels/"
 # Verify that the directory exists
 if not os.path.isdir(src_dir):
     print(src_dir + " directory does not exist")
@@ -81,7 +88,7 @@ for file_ in os.listdir(src_dir):
     
 #full_dataframe.round({"coord_x": 4, "coord_y": 4, "coord_z":4})
 full_dataframe = full_dataframe.drop_duplicates() #drop duplicate rows
-full_dataframe.to_csv(settings.BASE_DIR + "patID_x_y_z_mal.csv", index=False)
+full_dataframe.to_csv(BASE_DIR + "patID_x_y_z_mal.csv", index=False)
     
 #################
 
@@ -89,7 +96,6 @@ full_dataframe.to_csv(settings.BASE_DIR + "patID_x_y_z_mal.csv", index=False)
 patients = full_dataframe.patient_id.unique()
 
 for patient in patients[0:1]:
-    print("A")
     patient_path = find_mhd_file(patient) #locate the path to the '.mhd' file
     image_array = fetch_image(patient_path)
     image_shape = image_array.shape

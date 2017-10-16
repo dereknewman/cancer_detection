@@ -36,6 +36,18 @@ def _resize_function(image_decoded, label):
   image_resized = tf.image.resize_images(image_decoded, [28, 28])
   return image_resized, label
 
+def _normalize(image):
+    """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 
+    """
+    MIN_BOUND = -1000.0
+    MAX_BOUND = 400.0
+    image = tf.maximum(MIN_BOUND, image)
+    image = tf.minimum(MAX_BOUND, image)
+    image = (image - MIN_BOUND)
+    image = image / (MAX_BOUND - MIN_BOUND)
+    image = image - 0.5
+    return image
+
 global_step = tf.contrib.framework.get_or_create_global_step()
 
 filenames = tf.placeholder(tf.string, shape=[None])
@@ -49,6 +61,7 @@ iterator = dataset.make_initializable_iterator()
 
 next_element = iterator.get_next()
 shape,label,cubes = next_element
+cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
 
 transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
 cubes_trans = tf.map_fn(lambda img: tf.transpose(img, transpose_index), cubes)

@@ -38,6 +38,18 @@ def augment_data(transpose_index,k_value, cubes):
     cubes_90 = tf.map_fn(lambda img: tf.image.rot90(img,k=k_value), cubes_trans)
     cubes_lr = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cubes_90)
     return cubes_lr
+
+def _normalize(image):
+    """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 
+    """
+    MIN_BOUND = -1000.0
+    MAX_BOUND = 400.0
+    image = tf.maximum(MIN_BOUND, image)
+    image = tf.minimum(MAX_BOUND, image)
+    image = (image - MIN_BOUND)
+    image = image / (MAX_BOUND - MIN_BOUND)
+    image = image - 0.5
+    return image
     
 
 global_step = tf.contrib.framework.get_or_create_global_step()
@@ -45,6 +57,7 @@ global_step = tf.contrib.framework.get_or_create_global_step()
 filenames = tf.placeholder(tf.string, shape=[None])
 dataset = tf.contrib.data.TFRecordDataset(filenames)
 dataset = dataset.map(_parse_function)  # Parse the record into tensors.
+
 dataset = dataset.shuffle(buffer_size=10000)
 
 dataset = dataset.repeat()  # Repeat the input indefinitely.
@@ -57,6 +70,7 @@ transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int
 k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
 
 shape,label,cubes = next_element
+cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
 cubes_aug = augment_data(transpose_index,k_value, cubes)
 
 #mal, lob, spic = tf.unstack(label,num = 3)

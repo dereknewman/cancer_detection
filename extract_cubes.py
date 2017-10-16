@@ -15,13 +15,14 @@ TARGET_VOXEL_MM = 0.682
 BASE_DIR = "/media/derek/disk1/kaggle_ndsb2017/"
 
 def normalize(image):
-    """ Normalize image -> clip data between -1000 and 400. Scale values to 0 to 1. #### SCALE TO -.5 to .5 ##### TODO:???????
+    """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 
     """
     MIN_BOUND = -1000.0
     MAX_BOUND = 400.0
     image = (image - MIN_BOUND) / (MAX_BOUND - MIN_BOUND)
     image[image > 1] = 1.
     image[image < 0] = 0.
+    image -= 0.5
     return image
 
 def plot_slice_box(image_array,z_perc,y_perc,x_perc):
