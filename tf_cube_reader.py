@@ -12,7 +12,7 @@ import numpy as np
 
 
 BATCH_SIZE = 128
-NUM_CLASSES = 6
+NUM_CLASSES = 3
 
 def _parse_function(example_proto):
   features = {"shape": tf.FixedLenFeature((), tf.string, default_value=""),
@@ -50,6 +50,16 @@ def _normalize(image):
     image = image / (MAX_BOUND - MIN_BOUND)
     image = image - 0.5
     return image
+
+
+def _randomize(image):
+    #randomize#
+    image = image - tf.reduce_min(image)
+    image = tf.pow(image, tf.random_uniform([1],minval=1,maxval=10))
+    image = image/tf.reduce_max(image)
+    image = image - 0.5
+    return image
+    ###########
     
 
 global_step = tf.contrib.framework.get_or_create_global_step()
@@ -71,6 +81,7 @@ k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
 
 shape,label,cubes = next_element
 cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
+cubes = _randomize(cubes)
 cubes_aug = augment_data(transpose_index,k_value, cubes)
 
 #mal, lob, spic = tf.unstack(label,num = 3)
@@ -213,6 +224,7 @@ weights = _variable_with_weight_decay('weights5', [192, NUM_CLASSES],
 biases = _variable_initializer('biases5', [NUM_CLASSES],
                           tf.constant_initializer(0.0))
 softmax_linear = tf.add(tf.matmul(local4, weights), biases, name='scope.name')
+mal_, lob_, spic_ = tf.split(softmax_linear,3,axis=1)
 _activation_summary(softmax_linear)
 
 #return softmax_linear
@@ -227,29 +239,41 @@ labels: Labels from distorted_inputs or inputs(). 1-D tensor
 Returns:
 Loss tensor of type float.
 """
-# Calculate the average cross entropy loss across the batch.
-#label_onehot_i64 = tf.cast(label_onehot, tf.int64)
-label_onehot_= tf.reshape(label_onehot,[128,6])
-cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
-cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-#tf.add_to_collection('losses', cross_entropy_mean)
+mal_fl32 = tf.cast(mal,tf.float32)
+lob_fl32 = tf.cast(lob,tf.float32)
+spic_fl32 = tf.cast(spic,tf.float32)
+
+mal_cost = tf.pow(mal_ - mal_fl32, 2)
+lob_cost = tf.pow(lob_ - lob_fl32, 2)
+spic_cost = tf.pow(spic_ - spic_fl32, 2)
+
+cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
+
+## Calculate the average cross entropy loss across the batch.
+##label_onehot_i64 = tf.cast(label_onehot, tf.int64)
+#label_onehot_= tf.reshape(label_onehot,[128,6])
+#cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+#        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
+#cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
+##tf.add_to_collection('losses', cross_entropy_mean)
 
 # The total loss is defined as the cross entropy loss plus all of the weight
 # decay terms (L2 loss).
 #return tf.add_n(tf.get_collection('losses'), name='total_loss')
 ##########################################################################
 ##########################################################################
-lr = 0.003
+lr = 0.00001
 optimizer_ = tf.train.GradientDescentOptimizer(lr)
-grads = optimizer_.compute_gradients(cross_entropy_mean)
+#grads = optimizer_.compute_gradients(cross_entropy_mean)
+grads = optimizer_.compute_gradients(cost_function)
 # Apply gradients.
 apply_gradient_op = optimizer_.apply_gradients(grads, global_step=global_step)
 train_op = apply_gradient_op
 
-
 sess = tf.InteractiveSession()
 init = tf.global_variables_initializer()
+saver = tf.train.Saver()
+
 sess.run(init)
 src_dir_train = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/train/"
 src_dir_test = "/media/derek/disk1/kaggle_ndsb2017/resources/_tfrecords/test/"
@@ -259,8 +283,8 @@ training_filenames = [src_dir_train + f for f in filenames_train]
 testing_filenames = [src_dir_test + f for f in filenames_test]
 
 
-f_train = open("train_values.txt","a")
-f_test = open("test_values.txt","a")
+f_train = open("train3_values_rand_" + str(lr) + ".txt","a")
+f_test = open("test3_values_rand_" + str(lr) + ".txt","a")
 transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
 
 #sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
@@ -269,14 +293,16 @@ for index in range(10000):
     sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
     for i in range(100):
         sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
-    train_results = sess.run(cross_entropy_mean,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    train_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
     print(train_results)
     f_train.write(str(train_results) + "\n")
     sess.run(iterator.initializer, feed_dict={filenames: testing_filenames})
-    test_results = sess.run(cross_entropy_mean,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    test_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
     f_test.write(str(test_results) + "\n")
     f_train.flush()
     f_test.flush()
+    if np.mod(index,9)==0:
+        ave_path = saver.save(sess, "/media/derek/disk1/kaggle_ndsb2017/saved_models/model.ckpt")
 
 
 
