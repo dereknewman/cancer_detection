@@ -18,23 +18,28 @@ BATCH_SIZE = 128
 NUM_CLASSES = 6
 
 def _parse_function(example_proto):
-  features = {"shape": tf.FixedLenFeature((), tf.string, default_value=""),
+    """Reads tfrecords with features {shape: (height,width,depth) of cube data,
+    label: (malignancy, lobulation, spiculation) labels, cube: usually 32x32x32 data). 
+    Mapped onto a TFRecord dataset
+    Args:
+        example_proto: TFRecord protobuffer of data 
+    Returns:
+        shape_int32: (int32) (height,width,depth)
+        label_int32: (int32) (malignancy, lobulation, spiculation)
+        cube: (float32) height x width x depth data (usually 32x32x32)
+    """
+    features = {"shape": tf.FixedLenFeature((), tf.string, default_value=""),
               "label": tf.FixedLenFeature((), tf.string, default_value=""),
               "cube": tf.FixedLenFeature((), tf.string, default_value="")}
-  parsed_features = tf.parse_single_example(example_proto, features)
-  shape = tf.decode_raw(parsed_features['shape'], tf.int16)
-  shape_int32 = tf.cast(shape,tf.int32)
-  label = tf.decode_raw(parsed_features['label'], tf.int16)
-  label_int32 = tf.cast(label,tf.int32)
-  cube_flat = tf.decode_raw(parsed_features['cube'], tf.int16)
-  cube_flat_f32 = tf.cast(cube_flat,dtype=tf.float32)
-  cube = tf.reshape(cube_flat_f32,[shape_int32[0],shape_int32[1],shape_int32[2]])
-  return shape_int32,label_int32,cube
-
-def _resize_function(image_decoded, label):
-  image_decoded.set_shape([None, None, None])
-  image_resized = tf.image.resize_images(image_decoded, [28, 28])
-  return image_resized, label
+    parsed_features = tf.parse_single_example(example_proto, features)
+    shape = tf.decode_raw(parsed_features['shape'], tf.int16)
+    shape_int32 = tf.cast(shape,tf.int32)
+    label = tf.decode_raw(parsed_features['label'], tf.int16)
+    label_int32 = tf.cast(label,tf.int32)
+    cube_flat = tf.decode_raw(parsed_features['cube'], tf.int16)
+    cube_flat_f32 = tf.cast(cube_flat,dtype=tf.float32)
+    cube = tf.reshape(cube_flat_f32,[shape_int32[0],shape_int32[1],shape_int32[2]])
+    return shape_int32,label_int32,cube
 
 def _normalize(image):
     """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 

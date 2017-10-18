@@ -15,29 +15,51 @@ BATCH_SIZE = 128
 NUM_CLASSES = 3
 
 def _parse_function(example_proto):
-  features = {"shape": tf.FixedLenFeature((), tf.string, default_value=""),
+    """Reads tfrecords with features {shape: (height,width,depth) of cube data,
+    label: (malignancy, lobulation, spiculation) labels, cube: usually 32x32x32 data). 
+    Mapped onto a TFRecord dataset
+    Args:
+        example_proto: TFRecord protobuffer of data 
+    Returns:
+        shape_int32: (int32) (height,width,depth)
+        label_int32: (int32) (malignancy, lobulation, spiculation)
+        cube: (float32) height x width x depth data (usually 32x32x32)
+    """
+    features = {"shape": tf.FixedLenFeature((), tf.string, default_value=""),
               "label": tf.FixedLenFeature((), tf.string, default_value=""),
               "cube": tf.FixedLenFeature((), tf.string, default_value="")}
-  parsed_features = tf.parse_single_example(example_proto, features)
-  shape = tf.decode_raw(parsed_features['shape'], tf.int16)
-  shape_int32 = tf.cast(shape,tf.int32)
-  label = tf.decode_raw(parsed_features['label'], tf.int16)
-  label_int32 = tf.cast(label,tf.int32)
-  cube_flat = tf.decode_raw(parsed_features['cube'], tf.int16)
-  cube_flat_f32 = tf.cast(cube_flat,dtype=tf.float32)
-  cube = tf.reshape(cube_flat_f32,[shape_int32[0],shape_int32[1],shape_int32[2]])
-  return shape_int32,label_int32,cube
+    parsed_features = tf.parse_single_example(example_proto, features)
+    shape = tf.decode_raw(parsed_features['shape'], tf.int16)
+    shape_int32 = tf.cast(shape,tf.int32)
+    label = tf.decode_raw(parsed_features['label'], tf.int16)
+    label_int32 = tf.cast(label,tf.int32)
+    cube_flat = tf.decode_raw(parsed_features['cube'], tf.int16)
+    cube_flat_f32 = tf.cast(cube_flat,dtype=tf.float32)
+    cube = tf.reshape(cube_flat_f32,[shape_int32[0],shape_int32[1],shape_int32[2]])
+    return shape_int32,label_int32,cube
 
-def _resize_function(image_decoded, label):
-  image_decoded.set_shape([None, None, None])
-  image_resized = tf.image.resize_images(image_decoded, [28, 28])
-  return image_resized, label
-
-def augment_data(transpose_index,k_value, cubes):
+def augment_data(transpose_index,k_value,flip_yes_no, cubes):
+    """augment data (cubes) by rotating the cubes k_values times, and tranposing
+    the indices specified by transpose_index. 
+    To randomize input: 
+        transpose_index: random permutation of [0,1,2]
+        k_value: random int [0-3]
+        flip_yes_no: random int [0-1]
+    Args:
+        transpose_index: (np array) array discribing the new order of the transposed
+            axis [x_axis, y_axis, z_axis] [0,1,2]-> would keep axis unchanged.
+        k_value: (int) number of rotations, 0 would keep data unrotated
+    Returns:
+        shape_int32: (int32) (height,width,depth)
+        label_int32: (int32) (malignancy, lobulation, spiculation)
+        cube: (float32) height x width x depth data (usually 32x32x32)
+    """
     cubes_trans = tf.map_fn(lambda img: tf.transpose(img, transpose_index), cubes)
     cubes_90 = tf.map_fn(lambda img: tf.image.rot90(img,k=k_value), cubes_trans)
-    cubes_lr = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cubes_90)
-    return cubes_lr
+    cubes_out = cubes_90
+    if flip_yes_no == 1:
+        cubes_out = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cubes_out)
+    return cubes_out
 
 def _normalize(image):
     """ Normalize image -> clip data between -1000 and 400. Scale values to -0.5 to 0.5 
@@ -53,14 +75,18 @@ def _normalize(image):
 
 
 def _randomize(image):
-    #randomize#
+    """Add randomization to the image by raising the image values to a random 
+    power between 1 and 10. Then renormalize to -.5 to .5 
+    Args:
+        image: input 3d data cube
+    Returns:
+        image: image after power and renormalized
+    """
     image = image - tf.reduce_min(image)
     image = tf.pow(image, tf.random_uniform([1],minval=1,maxval=10))
     image = image/tf.reduce_max(image)
     image = image - 0.5
     return image
-    ###########
-    
 
 global_step = tf.contrib.framework.get_or_create_global_step()
 
@@ -78,11 +104,12 @@ next_element = iterator.get_next()
 
 transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
 k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+flip_yes_no = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
 
 shape,label,cubes = next_element
 cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
 cubes = _randomize(cubes)
-cubes_aug = augment_data(transpose_index,k_value, cubes)
+cubes_aug = augment_data(transpose_index, k_value, flip_yes_no, cubes)
 
 #mal, lob, spic = tf.unstack(label,num = 3)
 mal, lob, spic = tf.split(label,3,axis=1)
