@@ -10,11 +10,6 @@ import os
 import tensorflow as tf
 import numpy as np
 
-
-BATCH_SIZE = 128
-#NUM_CLASSES = 3
-NUM_CLASSES = 6
-
 def _parse_function(example_proto):
     """Reads tfrecords with features {shape: (height,width,depth) of cube data,
     label: (malignancy, lobulation, spiculation) labels, cube: usually 32x32x32 data). 
@@ -89,33 +84,6 @@ def _randomize(image):
     image = image - 0.5
     return image
 
-global_step = tf.contrib.framework.get_or_create_global_step()
-
-filenames = tf.placeholder(tf.string, shape=[None])
-dataset = tf.contrib.data.TFRecordDataset(filenames)
-dataset = dataset.map(_parse_function)  # Parse the record into tensors.
-
-dataset = dataset.shuffle(buffer_size=10000)
-
-dataset = dataset.repeat()  # Repeat the input indefinitely.
-dataset = dataset.batch(BATCH_SIZE)
-iterator = dataset.make_initializable_iterator()
-
-next_element = iterator.get_next()
-
-transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
-k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
-flip_yes_no = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
-
-shape,label,cubes = next_element
-cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
-cubes = _randomize(cubes)
-cubes_aug = augment_data(transpose_index, k_value, flip_yes_no, cubes)
-
-#mal, lob, spic = tf.unstack(label,num = 3)
-mal, lob, spic = tf.split(label,3,axis=1)
-label_onehot = tf.one_hot(mal,6)
-label_f= tf.reshape(mal,[BATCH_SIZE])
 
 ##########################################################################
 ##########################################################################
@@ -169,6 +137,40 @@ def _activation_summary(x):
     #tf.summary.scalar(x)
     pass
 
+
+BATCH_SIZE = 128
+#NUM_CLASSES = 3
+NUM_CLASSES = 6
+
+global_step = tf.contrib.framework.get_or_create_global_step()
+
+filenames = tf.placeholder(tf.string, shape=[None])
+dataset = tf.contrib.data.TFRecordDataset(filenames)
+dataset = dataset.map(_parse_function)  # Parse the record into tensors.
+
+dataset = dataset.shuffle(buffer_size=10000)
+
+dataset = dataset.repeat()  # Repeat the input indefinitely.
+dataset = dataset.batch(BATCH_SIZE)
+iterator = dataset.make_initializable_iterator()
+
+next_element = iterator.get_next()
+
+transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
+k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+flip_yes_no = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+
+shape,label,cubes = next_element
+cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
+cubes = _randomize(cubes)
+cubes_aug = augment_data(transpose_index, k_value, flip_yes_no, cubes)
+
+#mal, lob, spic = tf.unstack(label,num = 3)
+mal, lob, spic = tf.split(label,3,axis=1)
+label_onehot = tf.one_hot(mal,6)
+label_f= tf.reshape(mal,[BATCH_SIZE])
+
+
 """Build the CIFAR-10 model.
 Args:
 images: Images returned from distorted_inputs() or inputs().
@@ -183,10 +185,10 @@ Logits.
   # conv1
 #with tf.variable_scope('conv1') as scope:
 kernel1 = _variable_with_weight_decay('weights1',
-                                     shape=[5, 5, 32, 64],
+                                     shape=[5, 5, 5, 1, 64],
                                      stddev=5e-2,
                                      wd=0.0)
-conv1_ = tf.nn.conv2d(cubes_aug, kernel1, [1, 1, 1, 1], padding='SAME')
+conv1_ = tf.nn.conv3d(cubes_aug, kernel1, [1, 1, 1, 1, 1], padding='SAME')
 biases1 = _variable_initializer('biases1', [64], tf.constant_initializer(0.0))
 pre_activation1 = tf.nn.bias_add(conv1_, biases1)
 conv1 = tf.nn.relu(pre_activation1, name='scope.name1')
@@ -217,10 +219,6 @@ norm2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
 # pool2
 pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1],
                      strides=[1, 2, 2, 1], padding='SAME', name='pool2')
-
-
-
-
 
 
 # local3
