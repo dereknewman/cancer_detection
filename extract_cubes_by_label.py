@@ -172,6 +172,22 @@ for patient in patients:
         x_perc = row["x_center_perc"]
         image_cube = extract_cube(image_array,z_perc,y_perc,x_perc)
         image_label = (row["malscore"], row["spiculation"], row["lobulation"])
-        add_to_tfrecord(writer,image_cube, image_label)
-    writer.close()
+        if row["malscore"] == 0:
+            add_to_tfrecord(writer0,image_cube, image_label)
+        if row["malscore"] == 1:
+            add_to_tfrecord(writer1,image_cube, image_label)
+        if row["malscore"] == 2:
+            add_to_tfrecord(writer2,image_cube, image_label)
+        if row["malscore"] == 3:
+            add_to_tfrecord(writer3,image_cube, image_label)
+        if row["malscore"] == 4:
+            add_to_tfrecord(writer4,image_cube, image_label)
+        if row["malscore"] == 5:
+            add_to_tfrecord(writer5,image_cube, image_label)
+    writer0.close()
+    writer1.close()
+    writer2.close()
+    writer3.close()
+    writer4.close()
+    writer5.close()
     #np.save(settings.BASE_DIR + "resources/_cubes/" + patient + '_train.npy', (image_cubes, image_labels))

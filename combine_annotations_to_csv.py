@@ -66,16 +66,18 @@ def fetch_image(src_path_file,TARGET_VOXEL_MM=1):
     spacing = np.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
     #rescale = spacing / TARGET_VOXEL_MM
     img_array = helpers.rescale_patient_images(img_array, spacing, TARGET_VOXEL_MM)
-    img_array = normalize(image_array)
+    img_array = normalize(img_array)
     return img_array
 
+
+########################################################################
+########## CREATE FULL DATAFRAME OF ALL PATIENTS AND NODULES  ##########
+########################################################################
 src_dir = LUNA16_EXTRACTED_IMAGE_DIR + "_labels/"
 # Verify that the directory exists
 if not os.path.isdir(src_dir):
     print(src_dir + " directory does not exist")
-
 full_dataframe = pd.DataFrame(columns=["patient_id", "coord_x", "coord_y", "coord_z", "malscore"]) 
-
 for file_ in os.listdir(src_dir):
     # Verify that the file is a '.csv' file
     if not file_[-4:] == '.csv':
@@ -90,10 +92,12 @@ for file_ in os.listdir(src_dir):
 #full_dataframe.round({"coord_x": 4, "coord_y": 4, "coord_z":4})
 full_dataframe = full_dataframe.drop_duplicates() #drop duplicate rows
 full_dataframe.to_csv(BASE_DIR + "patID_x_y_z_mal.csv", index=False)
-    
-#################
+#########################################################################
 
 
+########################################################################
+##########                  EXTRAS                            ##########
+########################################################################
 patients = full_dataframe.patient_id.unique()
 
 for patient in patients[0:1]:
@@ -106,7 +110,6 @@ for patient in patients[0:1]:
         x = int(row["coord_x"]*image_shape[0])
         y = int(row["coord_y"]*image_shape[1])
         z = int(row["coord_z"]*image_shape[2])
-        
         print(x,y,z)
     
     
