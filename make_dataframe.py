@@ -1,27 +1,26 @@
 import settings
-import helpers
 import SimpleITK  # conda install -c https://conda.anaconda.org/simpleitk SimpleITK
 import numpy
 import pandas
-import ntpath
-import cv2  # conda install -c https://conda.anaconda.org/menpo opencv3
-import shutil
 import random
-import math
-import multiprocessing
 from bs4 import BeautifulSoup #  conda install beautifulsoup4, coda install lxml
 import os
 import glob
 
 random.seed(1321)
 numpy.random.seed(1321)
-
+TARGET_VOXEL_MM = 0.682
 
 xml_dir = "/media/derek/disk1/kaggle_ndsb2017/resources/_luna16_xml/"
 xml_path = xml_dir + "185_088.xml"
 
 def find_mhd_file(patient_id):
-    """ find the '.mhd' file associated with a specific patient_id
+    """find the directory path containing the '.mhd' file associated with a specific patient_id. file must be 
+    in the form of patient_id.mhd (i.e. 1.2.34.5678.mhd)
+    Args:
+        patient_id: (string) patient's id
+    Returns:
+        src_path: (string) path to the directory containing the patient_id file
     """
     src_dir = "/media/derek/disk1/kaggle_ndsb2017/resources/_luna16_mhd/"
     for src_path in glob.glob(src_dir + "*.mhd"):
@@ -33,6 +32,13 @@ def find_mhd_file(patient_id):
 def load_lidc_xml(xml_path):
     """ Read the xml file and create a csv with the (x,y,z) location, diameter, and malignacy of
     the positive examples, and a csv with the negative examples
+    Args:
+        xml_path: (string) directory path + filename to xml file to read
+    Returns:
+        full_df: (pandas dataframe) dataframe containing ["patient_id", "x_center", 
+                 "y_center", "z_center", "diameter", "x_center_perc", "y_center_perc", 
+                 "z_center_perc", "diameter_perc", "malscore", "spiculation", 
+                 "lobulation", "file_path","xml_path"]
     """
     #Empty dataframe
     full_df = pandas.DataFrame(columns=["patient_id", "x_center", "y_center", 
@@ -58,17 +64,14 @@ def load_lidc_xml(xml_path):
     num_z, height, width = img_array.shape        #heightXwidth constitute the transverse plane
     origin = numpy.array(itk_img.GetOrigin())      # x,y,z  Origin in world coordinates (mm)
     spacing = numpy.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
-    rescale = spacing / settings.TARGET_VOXEL_MM
     ###########################################################################
     
     lines = []
     reading_sessions = xml.LidcReadMessage.find_all("readingSession")
     for reading_session in reading_sessions:
-        # print("Sesion")
         nodules = reading_session.find_all("unblindedReadNodule")
         for nodule in nodules:
             nodule_id = nodule.noduleID.text
-            # print("  ", nodule.noduleID)
             rois = nodule.find_all("roi")
             x_min = y_min = z_min = 999999
             x_max = y_max = z_max = -999999
@@ -109,20 +112,18 @@ def load_lidc_xml(xml_path):
                 continue
 
             malignacy = nodule.characteristics.malignancy.text
+            lobulation = nodule.characteristics.lobulation.text
+            spiculation = nodule.characteristics.spiculation.text
+            #### OTHER POSSIBLE CHARACTERISTICS ####
             #sphericiy = nodule.characteristics.sphericity.text
             #margin = nodule.characteristics.margin.text
-            spiculation = nodule.characteristics.spiculation.text
             #texture = nodule.characteristics.texture.text
             #calcification = nodule.characteristics.calcification.text
             #internal_structure = nodule.characteristics.internalStructure.text
-            lobulation = nodule.characteristics.lobulation.text
             #subtlety = nodule.characteristics.subtlety.text
-
             line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, malignacy, spiculation, lobulation, src_path, xml_path]
-            #extended_line = [patient_id, nodule_id, x_center_perc, y_center_perc, z_center_perc, diameter_perc, malignacy, sphericiy, margin, spiculation, texture, calcification, internal_structure, lobulation, subtlety ]
             lines.append(line)
-            #extended_lines.append(extended_line)
-
+            
         nonNodules = reading_session.find_all("nonNodule")
         for nonNodule in nonNodules:
             z_center = float(nonNodule.imageZposition.text)
@@ -136,7 +137,6 @@ def load_lidc_xml(xml_path):
             z_center_perc = round(z_center / img_array.shape[0], 4)
             diameter = 0
             diameter_perc = round(max(6 / img_array.shape[2], 6 / img_array.shape[1]), 4)
-            # print("Non nodule!", z_center)
             line = [patient_id, x_center, y_center, z_center, diameter, x_center_perc, y_center_perc, z_center_perc, diameter_perc, 0, 0, 0, src_path, xml_path]
             lines.append(line)
 

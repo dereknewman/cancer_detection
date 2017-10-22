@@ -12,7 +12,8 @@ import numpy as np
 
 
 BATCH_SIZE = 128
-NUM_CLASSES = 3
+#NUM_CLASSES = 3
+NUM_CLASSES = 6
 
 def _parse_function(example_proto):
     """Reads tfrecords with features {shape: (height,width,depth) of cube data,
@@ -266,23 +267,26 @@ labels: Labels from distorted_inputs or inputs(). 1-D tensor
 Returns:
 Loss tensor of type float.
 """
-mal_fl32 = tf.cast(mal,tf.float32)
-lob_fl32 = tf.cast(lob,tf.float32)
-spic_fl32 = tf.cast(spic,tf.float32)
+#mal_fl32 = tf.cast(mal,tf.float32)
+#lob_fl32 = tf.cast(lob,tf.float32)
+#spic_fl32 = tf.cast(spic,tf.float32)
+#
+#mal_cost = tf.pow(mal_ - mal_fl32, 2)
+#lob_cost = tf.pow(lob_ - lob_fl32, 2)
+#spic_cost = tf.pow(spic_ - spic_fl32, 2)
+#
+#cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
 
-mal_cost = tf.pow(mal_ - mal_fl32, 2)
-lob_cost = tf.pow(lob_ - lob_fl32, 2)
-spic_cost = tf.pow(spic_ - spic_fl32, 2)
-
-cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
-
-## Calculate the average cross entropy loss across the batch.
-##label_onehot_i64 = tf.cast(label_onehot, tf.int64)
-#label_onehot_= tf.reshape(label_onehot,[128,6])
-#cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-#        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
-#cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-##tf.add_to_collection('losses', cross_entropy_mean)
+# Calculate the average cross entropy loss across the batch.
+#label_onehot_i64 = tf.cast(label_onehot, tf.int64)
+label_onehot_= tf.reshape(label_onehot,[BATCH_SIZE,NUM_CLASSES])
+cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
+cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
+#tf.add_to_collection('losses', cross_entropy_mean)
+labels_=tf.argmax(label_onehot_,axis=1)
+predictions_=tf.argmax(softmax_linear,axis=1)
+accuracy = (tf.reduce_sum(tf.cast(tf.equal(labels_,predictions_),tf.int32)))/BATCH_SIZE
 
 # The total loss is defined as the cross entropy loss plus all of the weight
 # decay terms (L2 loss).
@@ -291,8 +295,8 @@ cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
 ##########################################################################
 lr = 0.00001
 optimizer_ = tf.train.GradientDescentOptimizer(lr)
-#grads = optimizer_.compute_gradients(cross_entropy_mean)
-grads = optimizer_.compute_gradients(cost_function)
+grads = optimizer_.compute_gradients(cross_entropy_mean)
+#grads = optimizer_.compute_gradients(cost_function)
 # Apply gradients.
 apply_gradient_op = optimizer_.apply_gradients(grads, global_step=global_step)
 train_op = apply_gradient_op
@@ -310,8 +314,8 @@ training_filenames = [src_dir_train + f for f in filenames_train]
 testing_filenames = [src_dir_test + f for f in filenames_test]
 
 
-f_train = open("train3_values_rand_" + str(lr) + ".txt","a")
-f_test = open("test3_values_rand_" + str(lr) + ".txt","a")
+f_train = open("train6_values_rand_" + str(lr) + ".txt","a")
+f_test = open("test6_values_rand_" + str(lr) + ".txt","a")
 transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
 
 #sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
@@ -320,11 +324,13 @@ for index in range(10000):
     sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
     for i in range(100):
         sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
-    train_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    #train_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    train_results = sess.run(accuracy,feed_dict={transpose_index: [0,1,2], k_value: 0})
     print(train_results)
     f_train.write(str(train_results) + "\n")
     sess.run(iterator.initializer, feed_dict={filenames: testing_filenames})
-    test_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    #test_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    test_results = sess.run(accuracy,feed_dict={transpose_index: [0,1,2], k_value: 0})
     f_test.write(str(test_results) + "\n")
     f_train.flush()
     f_test.flush()

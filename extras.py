@@ -125,3 +125,31 @@ plt.imshow(im_cube_r[0,:,:])
 #cubes_90 = tf.cond(tf.equal(random_condition2,2), lambda: tf.map_fn(lambda img: tf.image.rot90(img,k=2), cubes_trans), lambda: cubes_trans)
 #cubes_90 = tf.cond(tf.equal(random_condition2,3), lambda: tf.map_fn(lambda img: tf.image.rot90(img,k=3), cubes_trans), lambda: cubes_trans)
 #
+def _resize_function(image_decoded, label):
+  image_decoded.set_shape([None, None, None])
+  image_resized = tf.image.resize_images(image_decoded, [28, 28])
+  return image_resized, label
+
+
+def plot_slice_box(image_array,z_perc,y_perc,x_perc):
+    image_array = image_array - image_array.min()
+    image_array = (image_array/image_array.max())*255
+    z_,y_,x_ = image_array.shape
+    z_loc = int(round(z_*z_perc))
+    y_loc = int(round(y_*y_perc))
+    x_loc = int(round(x_*x_perc))
+    im_slice = image_array[z_loc,:,:].copy()
+    im_slice[y_loc-16:y_loc+16,x_loc-16] = 255
+    im_slice[y_loc-16:y_loc+16,x_loc+16] = 255
+    im_slice[y_loc-16,x_loc-16:x_loc+16] = 255
+    im_slice[y_loc+16,x_loc-16:x_loc+16] = 255
+    #plt.imshow(im_slice,cmap="gray")
+    cv2.imwrite(BASE_DIR + "/resources/_images/img_" + str(z_loc)+'_'+str(y_loc)+'_'+str(x_loc) + ".png", im_slice)
+    
+    
+    
+    
+    
+    
+
+

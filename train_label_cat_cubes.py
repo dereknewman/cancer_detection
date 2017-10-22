@@ -10,10 +10,6 @@ import os
 import tensorflow as tf
 import numpy as np
 
-
-BATCH_SIZE = 128
-NUM_CLASSES = 3
-
 def _parse_function(example_proto):
     """Reads tfrecords with features {shape: (height,width,depth) of cube data,
     label: (malignancy, lobulation, spiculation) labels, cube: usually 32x32x32 data). 
@@ -88,33 +84,6 @@ def _randomize(image):
     image = image - 0.5
     return image
 
-global_step = tf.contrib.framework.get_or_create_global_step()
-
-filenames = tf.placeholder(tf.string, shape=[None])
-dataset = tf.contrib.data.TFRecordDataset(filenames)
-dataset = dataset.map(_parse_function)  # Parse the record into tensors.
-
-dataset = dataset.shuffle(buffer_size=10000)
-
-dataset = dataset.repeat()  # Repeat the input indefinitely.
-dataset = dataset.batch(BATCH_SIZE)
-iterator = dataset.make_initializable_iterator()
-
-next_element = iterator.get_next()
-
-transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
-k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
-flip_yes_no = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
-
-shape,label,cubes = next_element
-cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
-cubes = _randomize(cubes)
-cubes_aug = augment_data(transpose_index, k_value, flip_yes_no, cubes)
-
-#mal, lob, spic = tf.unstack(label,num = 3)
-mal, lob, spic = tf.split(label,3,axis=1)
-label_onehot = tf.one_hot(mal,6)
-label_f= tf.reshape(mal,[BATCH_SIZE])
 
 ##########################################################################
 ##########################################################################
@@ -168,6 +137,40 @@ def _activation_summary(x):
     #tf.summary.scalar(x)
     pass
 
+
+BATCH_SIZE = 128
+#NUM_CLASSES = 3
+NUM_CLASSES = 6
+
+global_step = tf.contrib.framework.get_or_create_global_step()
+
+filenames = tf.placeholder(tf.string, shape=[None])
+dataset = tf.contrib.data.TFRecordDataset(filenames)
+dataset = dataset.map(_parse_function)  # Parse the record into tensors.
+
+dataset = dataset.shuffle(buffer_size=10000)
+
+dataset = dataset.repeat()  # Repeat the input indefinitely.
+dataset = dataset.batch(BATCH_SIZE)
+iterator = dataset.make_initializable_iterator()
+
+next_element = iterator.get_next()
+
+transpose_index = tf.Variable(initial_value=[0,1,2],trainable=False,dtype=tf.int32)
+k_value = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+flip_yes_no = tf.Variable(initial_value=0,trainable=False,dtype=tf.int32)
+
+shape,label,cubes = next_element
+cubes = _normalize(cubes)  # Normalize t0 -.5 to .5.
+cubes = _randomize(cubes)
+cubes_aug = augment_data(transpose_index, k_value, flip_yes_no, cubes)
+
+#mal, lob, spic = tf.unstack(label,num = 3)
+mal, lob, spic = tf.split(label,3,axis=1)
+label_onehot = tf.one_hot(mal,6)
+label_f= tf.reshape(mal,[BATCH_SIZE])
+
+
 """Build the CIFAR-10 model.
 Args:
 images: Images returned from distorted_inputs() or inputs().
@@ -182,10 +185,10 @@ Logits.
   # conv1
 #with tf.variable_scope('conv1') as scope:
 kernel1 = _variable_with_weight_decay('weights1',
-                                     shape=[5, 5, 32, 64],
+                                     shape=[5, 5, 5, 1, 64],
                                      stddev=5e-2,
                                      wd=0.0)
-conv1_ = tf.nn.conv2d(cubes_aug, kernel1, [1, 1, 1, 1], padding='SAME')
+conv1_ = tf.nn.conv3d(cubes_aug, kernel1, [1, 1, 1, 1, 1], padding='SAME')
 biases1 = _variable_initializer('biases1', [64], tf.constant_initializer(0.0))
 pre_activation1 = tf.nn.bias_add(conv1_, biases1)
 conv1 = tf.nn.relu(pre_activation1, name='scope.name1')
@@ -216,10 +219,6 @@ norm2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
 # pool2
 pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1],
                      strides=[1, 2, 2, 1], padding='SAME', name='pool2')
-
-
-
-
 
 
 # local3
@@ -266,23 +265,26 @@ labels: Labels from distorted_inputs or inputs(). 1-D tensor
 Returns:
 Loss tensor of type float.
 """
-mal_fl32 = tf.cast(mal,tf.float32)
-lob_fl32 = tf.cast(lob,tf.float32)
-spic_fl32 = tf.cast(spic,tf.float32)
+#mal_fl32 = tf.cast(mal,tf.float32)
+#lob_fl32 = tf.cast(lob,tf.float32)
+#spic_fl32 = tf.cast(spic,tf.float32)
+#
+#mal_cost = tf.pow(mal_ - mal_fl32, 2)
+#lob_cost = tf.pow(lob_ - lob_fl32, 2)
+#spic_cost = tf.pow(spic_ - spic_fl32, 2)
+#
+#cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
 
-mal_cost = tf.pow(mal_ - mal_fl32, 2)
-lob_cost = tf.pow(lob_ - lob_fl32, 2)
-spic_cost = tf.pow(spic_ - spic_fl32, 2)
-
-cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
-
-## Calculate the average cross entropy loss across the batch.
-##label_onehot_i64 = tf.cast(label_onehot, tf.int64)
-#label_onehot_= tf.reshape(label_onehot,[128,6])
-#cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
-#        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
-#cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-##tf.add_to_collection('losses', cross_entropy_mean)
+# Calculate the average cross entropy loss across the batch.
+#label_onehot_i64 = tf.cast(label_onehot, tf.int64)
+label_onehot_= tf.reshape(label_onehot,[BATCH_SIZE,NUM_CLASSES])
+cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
+        labels=label_f, logits=softmax_linear, name='cross_entropy_per_example')
+cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
+#tf.add_to_collection('losses', cross_entropy_mean)
+labels_=tf.argmax(label_onehot_,axis=1)
+predictions_=tf.argmax(softmax_linear,axis=1)
+accuracy = (tf.reduce_sum(tf.cast(tf.equal(labels_,predictions_),tf.int32)))/BATCH_SIZE
 
 # The total loss is defined as the cross entropy loss plus all of the weight
 # decay terms (L2 loss).
@@ -291,8 +293,8 @@ cost_function = tf.reduce_sum(mal_cost + lob_cost + spic_cost)
 ##########################################################################
 lr = 0.00001
 optimizer_ = tf.train.GradientDescentOptimizer(lr)
-#grads = optimizer_.compute_gradients(cross_entropy_mean)
-grads = optimizer_.compute_gradients(cost_function)
+grads = optimizer_.compute_gradients(cross_entropy_mean)
+#grads = optimizer_.compute_gradients(cost_function)
 # Apply gradients.
 apply_gradient_op = optimizer_.apply_gradients(grads, global_step=global_step)
 train_op = apply_gradient_op
@@ -310,8 +312,8 @@ training_filenames = [src_dir_train + f for f in filenames_train]
 testing_filenames = [src_dir_test + f for f in filenames_test]
 
 
-f_train = open("train3_values_rand_" + str(lr) + ".txt","a")
-f_test = open("test3_values_rand_" + str(lr) + ".txt","a")
+f_train = open("train6_values_rand_" + str(lr) + ".txt","a")
+f_test = open("test6_values_rand_" + str(lr) + ".txt","a")
 transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
 
 #sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
@@ -320,11 +322,13 @@ for index in range(10000):
     sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
     for i in range(100):
         sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
-    train_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    #train_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    train_results = sess.run(accuracy,feed_dict={transpose_index: [0,1,2], k_value: 0})
     print(train_results)
     f_train.write(str(train_results) + "\n")
     sess.run(iterator.initializer, feed_dict={filenames: testing_filenames})
-    test_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    #test_results = sess.run(cost_function,feed_dict={transpose_index: [0,1,2], k_value: 0})
+    test_results = sess.run(accuracy,feed_dict={transpose_index: [0,1,2], k_value: 0})
     f_test.write(str(test_results) + "\n")
     f_train.flush()
     f_test.flush()
