@@ -32,6 +32,8 @@ def plot_data(f_name):
 f_path = "/media/derek/disk1/kaggle_ndsb2017/"
 f_name_test = "test3_values_rand_1e-05.txt"
 f_name_train = "train3_values_rand_1e-05.txt"
+f_name_test = "test6_cubes1_1e-05.txt"
+f_name_train = "train6_cubes1_1e-05.txt"
 
 plot_data(f_path + f_name_train)
 plot_data(f_path + f_name_test)
