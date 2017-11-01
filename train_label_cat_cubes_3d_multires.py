@@ -183,9 +183,10 @@ Logits.
   # by replacing all instances of tf.get_variable() with tf.Variable().
   #
   # conv1
+#### CONV 1 #####
 #with tf.variable_scope('conv1') as scope:
 kernel1 = _variable_with_weight_decay('weights1',
-                                     shape=[5, 5, 5, 1, 8],
+                                     shape=[3, 3, 3, 1, 8],
                                      stddev=5e-2,
                                      wd=0.0)
 conv1_ = tf.nn.conv3d(cubes_aug, kernel1, [1, 1, 1, 1, 1], padding='SAME')
@@ -199,17 +200,24 @@ pool1 = tf.nn.max_pool3d(conv1, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
                      padding='SAME', name='pool1')
 # norm1
 norm1 = pool1 
+
+
+
 #tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
 #                name='norm1')
 
-# conv2
+#### CONV 2 #####
 #with tf.variable_scope('conv2') as scope:
+avg1 = tf.nn.avg_pool3d(cubes_aug, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                     padding='SAME', name='poolavg2')
+input2 = tf.concat([norm1, avg1],axis=4)
+
 kernel2 = _variable_with_weight_decay('weights2',
-                                     shape=[5, 5, 5, 8, 64],
+                                     shape=[3, 3, 3, 9, 24],
                                      stddev=5e-2,
                                      wd=0.0)
-conv2_ = tf.nn.conv3d(norm1, kernel2, [1, 1, 1, 1, 1], padding='SAME')
-biases2 = _variable_initializer('biases2', [64], tf.constant_initializer(0.1))
+conv2_ = tf.nn.conv3d(input2, kernel2, [1, 1, 1, 1, 1], padding='SAME')
+biases2 = _variable_initializer('biases2', [24], tf.constant_initializer(0.1))
 pre_activation2 = tf.nn.bias_add(conv2_, biases2)
 conv2 = tf.nn.relu(pre_activation2, name='scope.name2')
 _activation_summary(conv2)
@@ -222,24 +230,82 @@ norm2 = conv2
 pool2 = tf.nn.max_pool3d(norm2, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
                        padding='SAME', name='pool2')
 
+# norm2
+norm2 = pool2 
+
+#### CONV 3 #####
+avg2 = tf.nn.avg_pool3d(avg1, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                     padding='SAME', name='poolavg3')
+input3 = tf.concat([norm2, avg2],axis=4)
+
+kernel3 = _variable_with_weight_decay('weights3',
+                                     shape=[3, 3, 3, 25, 48],
+                                     stddev=5e-2,
+                                     wd=0.0)
+conv3_ = tf.nn.conv3d(input3, kernel3, [1, 1, 1, 1, 1], padding='SAME')
+biases3 = _variable_initializer('biases3', [48], tf.constant_initializer(0.1))
+pre_activation3 = tf.nn.bias_add(conv3_, biases3)
+conv3 = tf.nn.relu(pre_activation3, name='scope.name3')
+_activation_summary(conv3)
+
+# norm3
+norm3 = conv3
+#tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
+#                name='norm2')
+# pool2
+pool3 = tf.nn.max_pool3d(norm3, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                       padding='SAME', name='pool3')
+
+# norm2
+norm3 = pool3
+#### CONV 4 #####
+avg3 = tf.nn.avg_pool3d(avg2, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                     padding='SAME', name='poolavg4')
+input4 = tf.concat([norm3, avg3],axis=4)
+
+kernel4 = _variable_with_weight_decay('weights4',
+                                     shape=[3, 3, 3, 49, 64],
+                                     stddev=5e-2,
+                                     wd=0.0)
+conv4_ = tf.nn.conv3d(input4, kernel4, [1, 1, 1, 1, 1], padding='SAME')
+biases4 = _variable_initializer('biases4', [64], tf.constant_initializer(0.1))
+pre_activation4 = tf.nn.bias_add(conv4_, biases4)
+conv4 = tf.nn.relu(pre_activation4, name='scope.name4')
+_activation_summary(conv4)
+
+# norm4
+norm4 = conv4
+#tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75,
+#                name='norm2')
+# pool4
+pool4 = tf.nn.max_pool3d(norm4, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                       padding='SAME', name='pool4')
+
+# norm4
+norm4 = pool4
+avg4 = tf.nn.avg_pool3d(avg3, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
+                     padding='SAME', name='poolavg4')
+#################
+input5 = tf.concat([norm4, avg4],axis=4)
+################
 
 # local3
 #with tf.variable_scope('local3') as scope:
 # Move everything into depth so we can perform a single matrix multiply.
-pool2_flatten = tf.reshape(pool2, [BATCH_SIZE, -1])
-dim = 32768
-weights = _variable_with_weight_decay('weights3', shape=[dim, 384],
+pool2_flatten = tf.reshape(input5, [BATCH_SIZE, -1])
+dim = 520
+weights = _variable_with_weight_decay('weights5', shape=[dim, 384],
                                       stddev=0.04, wd=0.004)
-biases = _variable_initializer('biases3', [384], tf.constant_initializer(0.1))
-local3 = tf.nn.relu(tf.matmul(pool2_flatten, weights) + biases, name='scope.name3')
+biases = _variable_initializer('biases5', [384], tf.constant_initializer(0.1))
+local3 = tf.nn.relu(tf.matmul(pool2_flatten, weights) + biases, name='scope.name5')
 _activation_summary(local3)
 
 # local4
 #with tf.variable_scope('local4') as scope:
-weights = _variable_with_weight_decay('weights4', shape=[384, 192],
+weights = _variable_with_weight_decay('weights6', shape=[384, 192],
                                       stddev=0.04, wd=0.004)
-biases = _variable_initializer('biases4', [192], tf.constant_initializer(0.1))
-local4 = tf.nn.relu(tf.matmul(local3, weights) + biases, name='scope.name4')
+biases = _variable_initializer('biases6', [192], tf.constant_initializer(0.1))
+local4 = tf.nn.relu(tf.matmul(local3, weights) + biases, name='scope.name6')
 _activation_summary(local4)
 
 # linear layer(WX + b),
@@ -247,11 +313,11 @@ _activation_summary(local4)
 # tf.nn.sparse_softmax_cross_entropy_with_logits accepts the unscaled logits
 # and performs the softmax internally for efficiency.
 #with tf.variable_scope('softmax_linear') as scope:
-weights = _variable_with_weight_decay('weights5', [192, NUM_CLASSES],
+weights = _variable_with_weight_decay('weights7', [192, NUM_CLASSES],
                                       stddev=1/192.0, wd=0.0)
-biases = _variable_initializer('biases5', [NUM_CLASSES],
+biases = _variable_initializer('biases7', [NUM_CLASSES],
                           tf.constant_initializer(0.0))
-softmax_linear = tf.add(tf.matmul(local4, weights), biases, name='scope.name')
+softmax_linear = tf.add(tf.matmul(local4, weights), biases, name='scope.name7')
 mal_, lob_, spic_ = tf.split(softmax_linear,3,axis=1)
 _activation_summary(softmax_linear)
 
@@ -314,8 +380,8 @@ training_filenames = [src_dir_train + f for f in filenames_train]
 testing_filenames = [src_dir_test + f for f in filenames_test]
 
 
-f_train = open("train6_values_rand_" + str(lr) + ".txt","a")
-f_test = open("test6_values_rand_" + str(lr) + ".txt","a")
+f_train = open("train6_mres1_rand_" + str(lr) + ".txt","a")
+f_test = open("test6_mres1_rand_" + str(lr) + ".txt","a")
 transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]])
 
 #sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
@@ -335,7 +401,7 @@ for index in range(10000):
     f_train.flush()
     f_test.flush()
     if np.mod(index,9)==0:
-        ave_path = saver.save(sess, "/media/derek/disk1/kaggle_ndsb2017/saved_models/model.ckpt")
+        ave_path = saver.save(sess, "/media/derek/disk1/kaggle_ndsb2017/saved_models_mres1/model.ckpt")
 
 
 
