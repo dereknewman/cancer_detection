@@ -9,6 +9,7 @@ Created on Wed Oct 11 14:36:29 2017
 import os
 import tensorflow as tf
 import numpy as np
+import random
 
 def _parse_function(example_proto):
     """Reads tfrecords with features {shape: (height,width,depth) of cube data,
@@ -359,7 +360,7 @@ accuracy = (tf.reduce_sum(tf.cast(tf.equal(labels_,predictions_),tf.int32)))/BAT
 #return tf.add_n(tf.get_collection('losses'), name='total_loss')
 ##########################################################################
 ##########################################################################
-lr = 0.00001
+lr = 0.0001
 optimizer_ = tf.train.GradientDescentOptimizer(lr)
 grads = optimizer_.compute_gradients(cross_entropy_mean)
 #grads = optimizer_.compute_gradients(cost_function)
@@ -387,6 +388,8 @@ transpose_possiblities = np.array([[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,
 #sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
 
 for index in range(10000):
+    random.shuffle(training_filenames)
+    random.shuffle(testing_filenames)
     sess.run(iterator.initializer, feed_dict={filenames: training_filenames})
     for i in range(100):
         sess.run(train_op, feed_dict={transpose_index: transpose_possiblities[np.random.randint(0,6),:], k_value: np.random.randint(0,4)})
@@ -401,7 +404,7 @@ for index in range(10000):
     f_train.flush()
     f_test.flush()
     if np.mod(index,9)==0:
-        ave_path = saver.save(sess, "/media/derek/disk1/kaggle_ndsb2017/saved_models_mres1/model.ckpt")
+        save_path = saver.save(sess, "/media/derek/disk1/kaggle_ndsb2017/saved_models_mres1/model.ckpt")
 
 
 
